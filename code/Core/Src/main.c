@@ -170,32 +170,33 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  Average_ADC_Value();
-//	  pos = avg_adc2;
-
-//	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
-//	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
-//	  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
-//	 	  if(Vfeedback > setSpd){
-//	 	  		  Vfeedback = setSpd;
-//	 	  	  }
-//	 	  if(Vfeedback < setSpd){
-//	 	  	  	Vfeedback = -setSpd;
-//	 	  	  }
 	  led2();
 	  if(mode == 1){
-	 	  if(Vfeedback >= 1)
-	 	  {
-	 		  setSpd = (Vfeedback/360)*(1000-700)+700;
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
-	 		  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+	 	  if(Vfeedback > 1){
+	 		  setSpd = (Vfeedback/360)*(1000-600)+600;
+	 		  if(Vfeedback < 180){
+	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
+	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
+	 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+	 		  }
+	 		  if(Vfeedback > 180){
+	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
+	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, SET);
+	 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+	 		  }
 	 	  }
-	 	  if(Vfeedback <= -1)
-	 	  {
-	 		 setSpd = (-Vfeedback/360)*(1000-700)+700;
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, SET);
-	 		  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+	 	  if(Vfeedback < -1){
+	 		  setSpd = (-Vfeedback/360)*(1000-600)+600;
+	 		  if(Vfeedback < -180){
+	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
+	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
+	 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+	 		  }
+	 		  if(Vfeedback > -180){
+	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
+	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, SET);
+	 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+	 		  }
 	 	  }
 	 	  if(Vfeedback < 1 && Vfeedback > -1)
 	 	  {
