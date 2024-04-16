@@ -51,6 +51,7 @@ UART_HandleTypeDef hlpuart1;
 UART_HandleTypeDef huart1;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim5;
 
 /* USER CODE BEGIN PV */
@@ -58,7 +59,10 @@ uint16_t mode = 1;
 uint16_t ADC_RawRead[10]={0};
 uint32_t avg_adc1;
 uint32_t avg_adc2;
-
+uint32_t avg_adc_part2;
+uint32_t QEIReadRaw;
+float angle_part2;
+float set_pos_part2;
 //struct _ADC_tag {
 //ADC_ChannelConfTypeDef Config;
 //uint16_t data;
@@ -95,13 +99,14 @@ float pos;
 float set_pos;
 
 float Vfeedback = 0;
+float Vfeedback2 = 0;
 
 float setSpd = 0;
 
 ///////UART///////
 
 int len = 0;
-char str[];
+char str;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -113,8 +118,11 @@ static void MX_ADC1_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 void led2();
+void LAB2PART2();
+void LAB2PART1();
 //void Average_ADC_Value();
 /* USER CODE END PFP */
 
@@ -157,8 +165,9 @@ int main(void)
   MX_TIM5_Init();
   MX_TIM1_Init();
   MX_USART1_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
   HAL_TIM_Base_Start_IT(&htim5);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 //  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
@@ -170,7 +179,9 @@ int main(void)
   PID.Ki = 0;
   PID.Kd = 0;
   arm_pid_init_f32(&PID, 0);
-
+  HAL_TIM_Base_Start(&htim1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
   ///////UART///////
 
 //  uint8_t text[] = "Hello World";
@@ -189,45 +200,20 @@ int main(void)
 	  Average_ADC_Value();
 	  led2();
 	  if(mode == 1){
-	 	  if(Vfeedback > 1){
-	 		  setSpd = (Vfeedback/360)*(1000-600)+600;
-	 		  if(Vfeedback < 180){
-	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
-	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
-	 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
-	 		  }
-	 		  if(Vfeedback > 180){
-	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
-	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, SET);
-	 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
-	 		  }
-	 	  }
-	 	  if(Vfeedback < -1){
-	 		  setSpd = (-Vfeedback/360)*(1000-600)+600;
-	 		  if(Vfeedback < -180){
-	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
-	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
-	 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
-	 		  }
-	 		  if(Vfeedback > -180){
-	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
-	 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, SET);
-	 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
-	 		  }
-	 	  }
-	 	  if(Vfeedback < 1 && Vfeedback > -1)
-	 	  {
-	 		  setSpd = 0;
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
-	 		  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
-	 	  }
+		  LAB2PART1();
 	  }
-
+	  if(mode == 2){
+		  LAB2PART2();
+	  }
+	  else
+	  	  {}
 	  //////UART/////
 	  sprintf( str, "%I32u", avg_adc1 );   /// uint to char ///
 	  len = sizeof(str);
+
+
   }
+
   /* USER CODE END 3 */
 }
 
@@ -507,6 +493,14 @@ static void MX_TIM1_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
   sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
   sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
   sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
@@ -528,6 +522,55 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 2 */
   HAL_TIM_MspPostInit(&htim1);
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_Encoder_InitTypeDef sConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 3071;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC1Filter = 0;
+  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC2Filter = 0;
+  if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
 
 }
 
@@ -675,22 +718,74 @@ void led2(){
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 		HAL_Delay(500);
 	}
-
 }
+void LAB2PART1(){
+	if(Vfeedback > 1){
+		 		  setSpd = (Vfeedback/360)*(1000-600)+600;
+		 		  if(Vfeedback < 180){
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
+		 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 		  }
+		 		  if(Vfeedback > 180){
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, SET);
+		 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 		  }
+		 	  }
+	if(Vfeedback < -1){
+		 		  setSpd = (-Vfeedback/360)*(1000-600)+600;
+		 		  if(Vfeedback < -180){
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
+		 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 		  }
+		 		  if(Vfeedback > -180){
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, SET);
+		 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 		  }
+		 	  }
+	if(Vfeedback < 1 && Vfeedback > -1)
+		 	  {
+		 		  setSpd = 0;
+		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
+		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
+		 		  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 	  }
+}
+void LAB2PART2(){
 
-//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
-//{
-//if(hadc == &hadc1)
-//{
-//ADC1_Channel[Current_Channel].data= HAL_ADC_GetValue(&hadc1);
-////change channel
-//Current_Channel++;
-//Current_Channel %= 2;
-//HAL_ADC_ConfigChannel(&hadc1,&ADC1_Channel[Current_Channel].Config);
-////start next ADC
-//HAL_ADC_Start_IT(&hadc1);
-//}
-//}
+	avg_adc_part2=avg_adc1;
+	if(Vfeedback2 > 1){
+		 		  setSpd = (Vfeedback2/360)*(1000-100)+100;
+		 		  if(Vfeedback2 < 180){
+		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2,  setSpd);
+		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3,0);
+		 		  }
+		 		  if(Vfeedback2 > 180){
+		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
+		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, setSpd);
+		 		  }
+		 	  }
+	if(Vfeedback2 < -1){
+		 		  setSpd = (-Vfeedback2/360)*(1000-100)+100;
+		 		  if(Vfeedback2 < -180){
+		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2,  setSpd);
+		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3,0);
+		 		  }
+		 		  if(Vfeedback2 > -180){
+		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
+		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, setSpd);
+		 		  }
+		 	  }
+	if(Vfeedback2 < 1 && Vfeedback2 > -1)
+		 	  {
+		 		  setSpd = 0;
+		 		 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
+		 		 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 0);
+		 	  }
+}
 
 void Average_ADC_Value() {
     uint32_t sum_adc1 = 0, sum_adc2 = 0;
@@ -707,12 +802,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if (htim == &htim5 )
   {
+	  QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
 	  ADCReadRaw = (avg_adc2/4095.0)*360.0;
 	  set_pos = (avg_adc1/4095.0)*360.0;
 	  pos = ADCReadRaw;
-//	  ADCReadOld = ADCReadRaw;
+
+	  set_pos_part2 = (avg_adc_part2/4095.0)*360.0;
+	  angle_part2 =(QEIReadRaw/3072.0)*360.0;
 
 	  Vfeedback = (arm_pid_f32(&PID, set_pos - pos)*1000);
+	  Vfeedback2 = (arm_pid_f32(&PID, set_pos_part2 - angle_part2)*1000);
   }
 }
 /* USER CODE END 4 */
@@ -731,6 +830,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
+
 
 #ifdef  USE_FULL_ASSERT
 /**
