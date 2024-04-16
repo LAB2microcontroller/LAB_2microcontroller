@@ -48,9 +48,11 @@ ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
 UART_HandleTypeDef hlpuart1;
-UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_lpuart1_rx;
+DMA_HandleTypeDef hdma_lpuart1_tx;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim5;
 
@@ -105,8 +107,16 @@ float setSpd = 0;
 
 ///////UART///////
 
-int len = 0;
-char str;
+uint8_t ADCgo[4];
+uint8_t RxBuffer[8];
+uint64_t _micros = 0;
+static uint64_t TimeStamp = 0;
+uint64_t CurrentTime = 0;
+uint64_t test = 0;
+static uint64_t TimeStamp ;
+uint64_t CurrentTime ;
+uint16_t avg_adc11;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -117,12 +127,14 @@ static void MX_LPUART1_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM1_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void led2();
 void LAB2PART2();
-void LAB2PART1();
+uint64_t micros();
+//void LAB2PART1();
+//uint64_t micros();
 //void Average_ADC_Value();
 /* USER CODE END PFP */
 
@@ -164,8 +176,8 @@ int main(void)
   MX_ADC1_Init();
   MX_TIM5_Init();
   MX_TIM1_Init();
-  MX_USART1_UART_Init();
   MX_TIM3_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
   HAL_TIM_Base_Start_IT(&htim5);
@@ -174,6 +186,7 @@ int main(void)
   HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
 //  HAL_ADC_Start_IT(&hadc1);
   HAL_ADC_Start_DMA(&hadc1, ADC_RawRead, 10);
+  HAL_TIM_Base_Start_IT(&htim2);
 
   PID.Kp = 0.001;
   PID.Ki = 0;
@@ -182,16 +195,15 @@ int main(void)
   HAL_TIM_Base_Start(&htim1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-  ///////UART///////
-
-//  uint8_t text[] = "Hello World";
-  HAL_UART_Transmit(&huart1, str , len, 10 );
+//  UARTInterruptConfig();
+  UARTDMAConfig();
 
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
   while (1)
   {
     /* USER CODE END WHILE */
@@ -206,12 +218,23 @@ int main(void)
 		  LAB2PART2();
 	  }
 	  else
-	  	  {}
+	  	  {
+
+	  	  }
+
+//	  uint64_t test2 = 0;
+//	  test = micros();
+//	  test2 = _micros;
 	  //////UART/////
-	  sprintf( str, "%I32u", avg_adc1 );   /// uint to char ///
-	  len = sizeof(str);
 
-
+//	  static uint64_t TimeStamp = 0;
+//	  uint64_t CurrentTime = micros();
+	  CurrentTime = micros();
+	  if(CurrentTime > TimeStamp)
+	  {
+		  TimeStamp = CurrentTime + 5000;// 200 HZ
+		  Adc_to_Matlab();
+	  }
   }
 
   /* USER CODE END 3 */
@@ -388,54 +411,6 @@ static void MX_LPUART1_UART_Init(void)
 }
 
 /**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
   * @brief TIM1 Initialization Function
   * @param None
   * @retval None
@@ -522,6 +497,51 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 2 */
   HAL_TIM_MspPostInit(&htim1);
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 169;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4.294967295E9;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
@@ -633,6 +653,12 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+  /* DMA1_Channel2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
+  /* DMA1_Channel3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
 
 }
 
@@ -814,6 +840,34 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	  Vfeedback2 = (arm_pid_f32(&PID, set_pos_part2 - angle_part2)*1000);
   }
 }
+
+//////UART/////
+//adc & 0xFF;
+//adc>>8 & oxFF
+
+uint64_t micros()
+{
+return __HAL_TIM_GET_COUNTER(&htim2)+_micros;
+}
+
+void Adc_to_Matlab(){
+	avg_adc11= avg_adc1;
+	ADCgo[0] = 0x69;
+	ADCgo[1] =(uint8_t)(avg_adc11& 0xFF);//avg_adc11/100;
+	ADCgo[2] =(uint8_t)((avg_adc11>>8)& 0xFF);//avg_adc11%100;
+	ADCgo[3] = 0x0A;
+HAL_UART_Transmit_IT(&hlpuart1, ADCgo, 4);
+
+}
+//void UARTInterruptConfig()
+//{
+//	HAL_UART_Receive_IT(&hlpuart1, RxBuffer, 100);
+//}
+
+void UARTDMAConfig()
+{
+	HAL_UART_Receive_DMA(&hlpuart1, RxBuffer, 100);
+}
 /* USER CODE END 4 */
 
 /**
@@ -830,7 +884,6 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
 
 #ifdef  USE_FULL_ASSERT
 /**
