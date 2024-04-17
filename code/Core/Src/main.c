@@ -119,6 +119,7 @@ uint16_t avg_adc11;
 int16_t Error = 0;
 uint16_t z = 0;
 
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -211,12 +212,13 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
 	  Average_ADC_Value();
 	  led2();
 	  CurrentTime = micros();
 	  if(CurrentTime > TimeStamp)
 	  {
-		  TimeStamp = CurrentTime + 5000;// 200 HZ
+		  TimeStamp = CurrentTime + 1000;// 200 HZ
 		  Adc_to_Matlab();
 		  Error = (uint16_t)(RxBuffer[2]<< 8) + (uint8_t)(RxBuffer[1]);
   }
@@ -786,10 +788,11 @@ void LAB2PART1(){
 		 	  }
 }
 void LAB2PART2(){
-
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
 	avg_adc_part2=avg_adc1;
 	if(Vfeedback2 > 1){
-		 		  setSpd = (Vfeedback2/360)*(1000-100)+100;
+		 		  setSpd = (Vfeedback2/360)*(500-100)+100;
 		 		  if(Vfeedback2 < 180){
 		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2,  setSpd);
 		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3,0);
@@ -800,7 +803,7 @@ void LAB2PART2(){
 		 		  }
 		 	  }
 	if(Vfeedback2 < -1){
-		 		  setSpd = (-Vfeedback2/360)*(1000-100)+100;
+		 		  setSpd = (-Vfeedback2/360)*(500-100)+100;
 		 		  if(Vfeedback2 < -180){
 		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2,  setSpd);
 		 			 __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3,0);
@@ -819,6 +822,8 @@ void LAB2PART2(){
 }
 
 void LAB2PART3(){
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 0);
 	if(Error > 326.76){
 		 		  setSpd = (Error/32676)*(1000-600)+600;
 		 		  if(Error < 16338){
@@ -869,7 +874,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if (htim == &htim5 )
   {
-	  QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
 	  ADCReadRaw = avg_adc2;
 	  set_pos = (avg_adc1/4095.0)*360.0;
 	  pos = (ADCReadRaw/4095.0)*360.0;;
@@ -897,7 +901,7 @@ void Adc_to_Matlab(){
 	ADCgo[1] =(uint8_t)(avg_adc11& 0xFF);//avg_adc11/100;
 	ADCgo[2] =(uint8_t)((avg_adc11>>8)& 0xFF);//avg_adc11%100;
 	ADCgo[3] = 0x0A;
-HAL_UART_Transmit_IT(&hlpuart1, ADCgo, 4);
+	HAL_UART_Transmit_IT(&hlpuart1, ADCgo, 4);
 
 }
 void UARTInterruptConfig()
@@ -909,7 +913,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 	if(huart == &hlpuart1)
 	{
-		RxBuffer[4] = '\0';
+//		RxBuffer[4] = '\0';
 		HAL_UART_Receive_IT(&hlpuart1, RxBuffer, 4);
 	}
 }

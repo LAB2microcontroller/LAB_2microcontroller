@@ -75,8 +75,8 @@ all: main-build
 main-build: LAB_2_microcontroller.elf secondary-outputs
 
 # Tool invocations
-LAB_2_microcontroller.elf LAB_2_microcontroller.map: $(OBJS) $(USER_OBJS) C:\Users\Window\Desktop\Y2\T2\Micro_New\LAB_2microcontroller\LAB_2microcontroller\code\STM32G474RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "LAB_2_microcontroller.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Window\Desktop\Y2\T2\Micro_New\LAB_2microcontroller\LAB_2microcontroller\code\STM32G474RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LAB_2_microcontroller.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+LAB_2_microcontroller.elf LAB_2_microcontroller.map: $(OBJS) $(USER_OBJS) C:\Users\phet9\Documents\GitHub\LAB_2microcontroller(2)\code\STM32G474RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "LAB_2_microcontroller.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\phet9\Documents\GitHub\LAB_2microcontroller(2)\code\STM32G474RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LAB_2_microcontroller.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
