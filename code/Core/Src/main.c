@@ -108,7 +108,7 @@ float setSpd = 0;
 ///////UART///////
 
 uint8_t ADCgo[4];
-uint8_t RxBuffer[8];
+uint8_t RxBuffer[4];
 uint64_t _micros = 0;
 static uint64_t TimeStamp = 0;
 uint64_t CurrentTime = 0;
@@ -116,6 +116,8 @@ uint64_t test = 0;
 static uint64_t TimeStamp ;
 uint64_t CurrentTime ;
 uint16_t avg_adc11;
+int16_t Error = 0;
+uint16_t z = 0;
 
 /* USER CODE END PV */
 
@@ -195,8 +197,8 @@ int main(void)
   HAL_TIM_Base_Start(&htim1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-//  UARTInterruptConfig();
-  UARTDMAConfig();
+  UARTInterruptConfig();
+//  UARTDMAConfig();
 
 
   /* USER CODE END 2 */
@@ -211,16 +213,22 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  Average_ADC_Value();
 	  led2();
+	  CurrentTime = micros();
+	  if(CurrentTime > TimeStamp)
+	  {
+		  TimeStamp = CurrentTime + 5000;// 200 HZ
+		  Adc_to_Matlab();
+		  Error = (uint16_t)(RxBuffer[2]<< 8) + (uint8_t)(RxBuffer[1]);
+  }
 	  if(mode == 1){
 		  LAB2PART1();
 	  }
-	  if(mode == 2){
+	  else if(mode == 2){
 		  LAB2PART2();
 	  }
-	  else
-	  	  {
-
-	  	  }
+	  else if(mode == 3){
+		  LAB2PART3();
+	  }
 
 //	  uint64_t test2 = 0;
 //	  test = micros();
@@ -229,13 +237,10 @@ int main(void)
 
 //	  static uint64_t TimeStamp = 0;
 //	  uint64_t CurrentTime = micros();
-	  CurrentTime = micros();
-	  if(CurrentTime > TimeStamp)
-	  {
-		  TimeStamp = CurrentTime + 5000;// 200 HZ
-		  Adc_to_Matlab();
+
+
+//		  UARTDMAConfig();
 	  }
-  }
 
   /* USER CODE END 3 */
 }
@@ -813,6 +818,42 @@ void LAB2PART2(){
 		 	  }
 }
 
+void LAB2PART3(){
+	if(Error > 326.76){
+		 		  setSpd = (Error/32676)*(1000-600)+600;
+		 		  if(Error < 16338){
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
+		 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 		  }
+		 		  if(Error > 16338){
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, SET);
+		 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 		  }
+		 	  }
+	if(Error < -326.76){
+		 		  setSpd = (-Error/32676)*(1000-600)+600;
+		 		  if(Error < -16338){
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, SET);
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
+		 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 		  }
+		 		  if(Error > -16338){
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
+		 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, SET);
+		 			  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 		  }
+		 	  }
+	if(Error < 326.76 && Error > -326.76)
+		 	  {
+		 		  setSpd = 0;
+		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, RESET);
+		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, RESET);
+		 		  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, setSpd);
+		 	  }
+}
+
 void Average_ADC_Value() {
     uint32_t sum_adc1 = 0, sum_adc2 = 0;
     for (uint32_t i = 0; i < 5; i++) {
@@ -829,9 +870,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim == &htim5 )
   {
 	  QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
-	  ADCReadRaw = (avg_adc2/4095.0)*360.0;
+	  ADCReadRaw = avg_adc2;
 	  set_pos = (avg_adc1/4095.0)*360.0;
-	  pos = ADCReadRaw;
+	  pos = (ADCReadRaw/4095.0)*360.0;;
 
 	  set_pos_part2 = (avg_adc_part2/4095.0)*360.0;
 	  angle_part2 =(QEIReadRaw/3072.0)*360.0;
@@ -851,7 +892,7 @@ return __HAL_TIM_GET_COUNTER(&htim2)+_micros;
 }
 
 void Adc_to_Matlab(){
-	avg_adc11= avg_adc1;
+	avg_adc11= avg_adc2;
 	ADCgo[0] = 0x69;
 	ADCgo[1] =(uint8_t)(avg_adc11& 0xFF);//avg_adc11/100;
 	ADCgo[2] =(uint8_t)((avg_adc11>>8)& 0xFF);//avg_adc11%100;
@@ -859,15 +900,30 @@ void Adc_to_Matlab(){
 HAL_UART_Transmit_IT(&hlpuart1, ADCgo, 4);
 
 }
-//void UARTInterruptConfig()
-//{
-//	HAL_UART_Receive_IT(&hlpuart1, RxBuffer, 100);
-//}
-
-void UARTDMAConfig()
+void UARTInterruptConfig()
 {
-	HAL_UART_Receive_DMA(&hlpuart1, RxBuffer, 100);
+	HAL_UART_Receive_IT(&hlpuart1, RxBuffer, 4);
 }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+
+	if(huart == &hlpuart1)
+	{
+		RxBuffer[4] = '\0';
+		HAL_UART_Receive_IT(&hlpuart1, RxBuffer, 4);
+	}
+}
+//void UARTDMAConfig()
+//{
+//	HAL_UART_Receive_DMA(&hlpuart1, RxBuffer, 8);
+//	HAL_UART_Receive_DMA(huart, pData, Size)
+	////Matlab to ADC//////
+//	uint8_t a = 0x08
+//	uint8_tint b = 0x06
+//	c = (uint16_t)(RxBuffer[6]<< 8) + (uint8_t)(RxBuffer[5]);
+//	c = (RxBuffer[6] & 0x0F) + ((RxBuffer[5] & 0x0F) << 4 );
+//	z = RxBuffer[5]+RxBuffer[6];
+
 /* USER CODE END 4 */
 
 /**
